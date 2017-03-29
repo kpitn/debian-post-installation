@@ -42,6 +42,14 @@ cd /tmp
 wget https://raw.githubusercontent.com/kpitn/debian-post-installation/master/conf/vimrc
 cp vimrc /etc/vim/
 
+if ! grep -Fxq "$FILENAME" my_list.txt
+then
+    wget https://raw.githubusercontent.com/kpitn/debian-post-installation/master/fail2ban/jail.conf
+    wget https://raw.githubusercontent.com/kpitn/debian-post-installation/master/fail2ban/magento.conf
+    cat jail.conf >> /etc/fail2ban/jail.conf
+    mv magento.conf /etc/fail2ban/filter.d/magento.conf
+fi
+
 echo -e -n "\n### Entrez l'adresse mail pour les rapports de securite: "
 read MAIL
 
