@@ -31,7 +31,7 @@ NGINX_VERSION="1.10.3"
 # PageSpeed version
 # https://github.com/pagespeed/ngx_pagespeed/releases
 PAGESPEED_VERSION="1.12.34.2-beta"
-PAGESPEED_PSOL_VERSION="1.12.34.2"
+PAGESPEED_PSOL_VERSION="1.12.34.2-x64"
 PAGESPEED_CACHE_DIR="/var/ngx_pagespeed_cache"
 
 # Functions
@@ -83,7 +83,7 @@ displayandexec() {
 
 NGINX_DEPS=""
 NGINX_OPTIONS="--conf-path=/etc/nginx/nginx.conf --error-log-path=/var/log/nginx/error.log --pid-path=/var/run/nginx.pid --lock-path=/var/lock/nginx.lock --http-log-path=/var/log/nginx/access.log"
-NGINX_MODULES="--with-http_dav_module --http-client-body-temp-path=/var/lib/nginx/body --with-http_ssl_module --http-proxy-temp-path=/var/lib/nginx/proxy --with-http_stub_status_module --http-fastcgi-temp-path=/var/lib/nginx/fastcgi --with-debug --with-http_flv_module --with-http_realip_module --with-http_mp4_module"
+NGINX_MODULES="--with-http_dav_module --http-client-body-temp-path=/var/lib/nginx/body --with-http_ssl_module --http-proxy-temp-path=/var/lib/nginx/proxy --with-http_stub_status_module --http-fastcgi-temp-path=/var/lib/nginx/fastcgi --with-http_flv_module --with-http_realip_module --with-http_mp4_module"
 
 if [[ $WITH_NAXSI == "TRUE" ]]; then
     # Add Naxsi module
@@ -92,7 +92,7 @@ fi
 
 if [[ $WITH_PAGESPEED == "TRUE" ]]; then
     # Add PageSpeed module
-    NGINX_MODULES=$NGINX_MODULES" --add-module=../ngx_pagespeed-release-"$PAGESPEED_VERSION
+    NGINX_MODULES=$NGINX_MODULES" --add-module=../ngx_pagespeed-"$PAGESPEED_VERSION
 fi
 
 displaytitle "Installation of NGinx $NGINX_VERSION"
@@ -123,6 +123,8 @@ if [ $EUID -ne 0 ]; then
 fi
 
 displaytitle "Install prerequisites"
+mkdir /tmp/nginx-install
+cd /tmp/nginx-install
 
 # Get GnuPG key pour DotDeb
 grep -rq '^deb\ .*dotdeb' /etc/apt/sources.list.d/*.list /etc/apt/sources.list > /dev/null 2>&1
@@ -146,9 +148,11 @@ displayandexec "Update the repositories list" $APT_GET update
 
 # Pre-requis
 displayandexec "Install development tools" $APT_GET install build-essential libpcre3 libpcre3-dev libssl-dev zlib1g-dev php5-dev unzip
-displayandexec "Install PHP-FPM5" $APT_GET install php5-cli php5-common php5-mysql php5-fpm php-pear php5-gd php5-curl php5-mcrypt php5-json php5-mysqlnd
-displayandexec "Install Redis" $APT_GET install redis php5-memcache php5-redis
-displayandexec "Install MariaDb" $APT_GET install mariadb-server
+displayandexec "Install PHP-FPM5" $APT_GET install php5-cli php5-common php5-fpm php-pear php5-gd php5-curl php5-mcrypt php5-json
+displayandexec "Install Redis" "$APT_GET install build-essential tcl8.5; wget http://download.redis.io/releases/redis-stable.tar.gz; tar xzf redis-stable.tar.gz; cd redis-stable; make; make install"
+
+displaytitle "Install MariaDb"
+$APT_GET install mariadb-server php5-mysql
 
 if [[ $NGINX_DEPS != "" ]]; then
   displayandexec "Install NGinx dependencies" $APT_GET install $NGINX_DEPS
@@ -168,7 +172,7 @@ if [[ $WITH_NAXSI == "TRUE" ]]; then
     displayandexec "Download Naxsi (HEAD version)" $WGET -O naxsi-master.zip  https://github.com/nbs-system/naxsi/archive/master.zip
 fi
 if [[ $WITH_PAGESPEED == "TRUE" ]]; then
-    displayandexec "Download PageSpeed" $WGET https://github.com/pagespeed/ngx_pagespeed/archive/release-$PAGESPEED_VERSION.zip
+    displayandexec "Download PageSpeed" $WGET https://github.com/pagespeed/ngx_pagespeed/archive/v$PAGESPEED_VERSION.zip
     displayandexec "Download PageSpeed (PSOL)" $WGET https://dl.google.com/dl/page-speed/psol/$PAGESPEED_PSOL_VERSION.tar.gz
 fi
 displayandexec "Download NGinx version $NGINX_VERSION" $WGET http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz
@@ -178,8 +182,8 @@ if [[ $WITH_NAXSI == "TRUE" ]]; then
     displayandexec "Uncompress Naxsi (HEAD version)" $UNZIP naxsi-master.zip
 fi
 if [[ $WITH_PAGESPEED == "TRUE" ]]; then
-    displayandexec "Uncompress PageSpeed" $UNZIP release-$PAGESPEED_VERSION.zip
-    displayandexec "Uncompress PageSpeed (PSOL)" "cd ngx_pagespeed-release-$PAGESPEED_VERSION/ ; tar zxvf ../$PAGESPEED_PSOL_VERSION.tar.gz ; cd .."
+    displayandexec "Uncompress PageSpeed" $UNZIP v$PAGESPEED_VERSION.zip
+    displayandexec "Uncompress PageSpeed (PSOL)" "cd ngx_pagespeed-$PAGESPEED_VERSION/ ; tar zxvf ../$PAGESPEED_PSOL_VERSION.tar.gz ; cd .."
     displayandexec "Create the PageSpeed cache directory" "mkdir -p $PAGESPEED_CACHE_DIR ; chown www-data:www-data $PAGESPEED_CACHE_DIR"
 fi
 displayandexec "Uncompress NGinx version $NGINX_VERSION" tar zxvf nginx-$NGINX_VERSION.tar.gz
@@ -215,9 +219,12 @@ then
     # Nginx + default site
     displayandexec "Init the default configuration file for NGinx" "$WGET https://raw.githubusercontent.com/kpitn/debian-post-installation/master/conf/nginx.conf ; mv nginx.conf /etc/nginx/"
 
+    # Download the init script
+    displayandexec "Install the NGinx init script" "$WGET https://raw.githubusercontent.com/kpitn/debian-post-installation/master/conf/nginx ; mv nginx /etc/init.d/ ; chmod 755 /etc/init.d/nginx ; /usr/sbin/update-rc.d -f nginx defaults"
+
 # Log file rotate
 cat > /etc/logrotate.d/nginx <<EOF
-/var/log/nginx/*_log {
+/var/log/nginx/*/*.log {
     missingok
     notifempty
     sharedscripts
@@ -240,6 +247,8 @@ else
 	displayandexec "Restart PHP" /etc/init.d/php5-fpm restart
 	displayandexec "Restart NGinx" "killall nginx ; /etc/init.d/nginx start"
 fi
+
+rm -rf /tmp/nginx-install
 
 # Summary
 echo ""
