@@ -42,7 +42,7 @@ cd /tmp
 wget https://raw.githubusercontent.com/kpitn/debian-post-installation/master/conf/vimrc
 cp vimrc /etc/vim/
 
-if ! grep -Fxq "$FILENAME" my_list.txt
+if ! grep -Fxq "[magento]" /etc/fail2ban/jail.conf
 then
     wget https://raw.githubusercontent.com/kpitn/debian-post-installation/master/fail2ban/jail.conf
     wget https://raw.githubusercontent.com/kpitn/debian-post-installation/master/fail2ban/magento.conf
