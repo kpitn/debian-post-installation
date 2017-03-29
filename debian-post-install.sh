@@ -10,7 +10,7 @@ VERSION="0.1"
 
 #=============================================================================
 # Application list to install
-LISTE="fail2ban vim curl ntp htop"
+LISTE="fail2ban vim curl ntp htop unzip"
 #=============================================================================
 
 # Test que le script est lance en root
